@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Life in Exam Mode</title>
+  <style>
+    :root {
+      --bg: #030504;
+      --panel: rgba(10, 24, 17, 0.66);
+      --panel-bright: rgba(30, 255, 128, 0.12);
+      --green: #39ff88;
+      --green-soft: #9cffc2;
+      --white: #f3fff7;
+      --muted: #94a59a;
+      --danger: #ff4664;
+      --amber: #ffcf5a;
+      --glass-border: rgba(129, 255, 178, 0.22);
+      --shadow: 0 0 32px rgba(57, 255, 136, 0.18);
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--white);
+      background:
+        radial-gradient(circle at 18% 20%, rgba(57, 255, 136, 0.16), transparent 26rem),
+        radial-gradient(circle at 88% 8%, rgba(255, 70, 100, 0.08), transparent 28rem),
+        linear-gradient(180deg, #020302 0%, #06100b 42%, #020403 100%);
+      font-family: var(--sans);
+      overflow-x: hidden;
+      cursor: none;
+    }
+
+    body.exam-mode {
+      animation: crisisPulse 0.8s infinite;
+    }
+
+    body.victory {
+      animation: victoryFlash 1.2s ease-in-out 2;
+    }
+
+    button,
+    a,
+    .hidden-trigger {
+      cursor: none;
+    }
+
+    .loader {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: grid;
+      place-items: center;
+      background: #020403;
+      transition: opacity 0.8s ease, visibility 0.8s ease;
+    }
+
+    .loader.done {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .loader-box {
+      width: min(520px, calc(100vw - 40px));
+      padding: 28px;
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      background: rgba(6, 16, 11, 0.78);
+      box-shadow: var(--shadow);
+      font-family: var(--mono);
+    }
+
+    .loader-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      color: var(--green);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+    }
+
+    .boot-lines {
+      margin: 18px 0 0;
+      padding: 0;
+      list-style: none;
+      color: var(--muted);
+      line-height: 1.8;
+      font-size: 0.86rem;
+    }
+
+    .boot-lines span {
+      color: var(--green-soft);
+    }
+
+    .cursor-glow {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 100;
+      width: 22px;
+      height: 22px;
+      pointer-events: none;
+      border: 1px solid rgba(57, 255, 136, 0.9);
+      border-radius: 999px;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 26px rgba(57, 255, 136, 0.72);
+      transition: width 0.18s ease, height 0.18s ease, border-color 0.18s ease;
+      mix-blend-mode: screen;
+    }
+
+    .cursor-glow.active {
+      width: 42px;
+      height: 42px;
+      border-color: rgba(255, 255, 255, 0.9);
+    }
+
+    .rain,
+    .scanlines,
+    .confetti-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .rain {
+      z-index: -2;
+      opacity: 0.45;
+      background-image:
+        linear-gradient(rgba(57, 255, 136, 0.16) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(57, 255, 136, 0.06) 1px, transparent 1px);
+      background-size: 88px 88px, 88px 88px;
+      animation: gridDrift 18s linear infinite;
+    }
+
+    .scanlines {
+      z-index: 60;
+      opacity: 0.11;
+      background: repeating-linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.12) 0,
+        rgba(255, 255, 255, 0.12) 1px,
+        transparent 1px,
+        transparent 5px
+      );
+      mix-blend-mode: overlay;
+    }
+
+    .orb {
+      position: fixed;
+      z-index: -1;
+      width: 2px;
+      height: 90px;
+      top: -100px;
+      background: linear-gradient(180deg, transparent, rgba(57, 255, 136, 0.55), transparent);
+      animation: rainFall linear infinite;
+      opacity: 0.65;
+    }
+
+    .sound-toggle {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      z-index: 20;
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      color: var(--green);
+      background: rgba(2, 8, 5, 0.78);
+      box-shadow: var(--shadow);
+      font: 1rem var(--mono);
+    }
+
+    .sound-toggle:hover {
+      transform: translateY(-2px);
+      background: rgba(57, 255, 136, 0.13);
+    }
+
+    main {
+      position: relative;
+      z-index: 1;
+    }
+
+    section {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 88px 0;
+    }
+
+    .hero {
+      min-height: 100vh;
+      display: grid;
+      align-items: center;
+      padding-top: 72px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+      gap: 48px;
+      align-items: center;
+    }
+
+    .eyebrow {
+      width: fit-content;
+      margin: 0 0 18px;
+      padding: 7px 10px;
+      border: 1px solid rgba(57, 255, 136, 0.38);
+      border-radius: 999px;
+      color: var(--green-soft);
+      background: rgba(57, 255, 136, 0.08);
+      font: 0.74rem var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      position: relative;
+      margin: 0;
+      color: var(--white);
+      font-size: clamp(3.2rem, 9vw, 8.4rem);
+      line-height: 0.86;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      text-shadow: 0 0 34px rgba(57, 255, 136, 0.16);
+    }
+
+    .glitch {
+      animation: glitchNudge 4.2s infinite;
+    }
+
+    .glitch::before,
+    .glitch::after {
+      content: attr(data-text);
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.65;
+    }
+
+    .glitch::before {
+      color: var(--green);
+      transform: translate(2px, -1px);
+      clip-path: inset(0 0 58% 0);
+      animation: glitchSlice 2.8s infinite;
+    }
+
+    .glitch::after {
+      color: var(--danger);
+      transform: translate(-2px, 1px);
+      clip-path: inset(52% 0 0 0);
+      animation: glitchSlice 3.6s infinite reverse;
+    }
+
+    .subtitle {
+      max-width: 650px;
+      margin: 28px 0 22px;
+      color: #d8fce4;
+      font-size: clamp(1.18rem, 3vw, 1.75rem);
+      line-height: 1.35;
+    }
+
+    .typing-row {
+      min-height: 38px;
+      color: var(--green);
+      font: clamp(1rem, 2.4vw, 1.28rem) var(--mono);
+    }
+
+    .typing-row::before {
+      content: "> ";
+      color: var(--muted);
+    }
+
+    .typing-cursor {
+      display: inline-block;
+      width: 10px;
+      height: 1.15em;
+      margin-left: 4px;
+      vertical-align: -0.18em;
+      background: var(--green);
+      animation: blink 0.9s steps(2, start) infinite;
+    }
+
+    .hero-terminal {
+      min-height: 420px;
+      padding: 22px;
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(12, 28, 19, 0.78), rgba(4, 9, 7, 0.72));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      transform: perspective(900px) rotateY(-5deg) rotateX(3deg);
+      transition: transform 0.35s ease;
+    }
+
+    .hero-terminal:hover {
+      transform: perspective(900px) rotateY(0deg) rotateX(0deg) translateY(-4px);
+    }
+
+    .terminal-top {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--danger);
+      box-shadow: 18px 0 var(--amber), 36px 0 var(--green);
+    }
+
+    .terminal-line {
+      margin: 12px 0;
+      color: var(--muted);
+      font: 0.92rem/1.6 var(--mono);
+    }
+
+    .terminal-line strong {
+      color: var(--green-soft);
+      font-weight: 600;
+    }
+
+    .panic-meter {
+      margin-top: 28px;
+      height: 12px;
+      border: 1px solid rgba(57, 255, 136, 0.38);
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .panic-fill {
+      width: 87%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--green), var(--amber), var(--danger));
+      animation: panicBreathe 1.8s ease-in-out infinite;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 28px;
+    }
+
+    h2 {
+      margin: 0;
+      color: var(--white);
+      font-size: clamp(2rem, 5vw, 4.6rem);
+      line-height: 0.94;
+      text-transform: uppercase;
+    }
+
+    .section-kicker {
+      max-width: 360px;
+      margin: 0;
+      color: var(--muted);
+      font: 0.96rem/1.55 var(--mono);
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .glass-card {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 14px 60px rgba(0, 0, 0, 0.32);
+      backdrop-filter: blur(18px);
+    }
+
+    .glass-card::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      background: linear-gradient(120deg, transparent 0%, rgba(57, 255, 136, 0.16) 48%, transparent 72%);
+      transform: translateX(-100%);
+      transition: transform 0.7s ease;
+      pointer-events: none;
+    }
+
+    .glass-card:hover::before {
+      transform: translateX(100%);
+    }
+
+    .status-card {
+      min-height: 180px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .status-name {
+      color: var(--muted);
+      font: 0.78rem var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .status-value {
+      margin-top: 10px;
+      color: var(--green);
+      font: 700 clamp(1.4rem, 3vw, 2.1rem) var(--mono);
+    }
+
+    .status-value.error {
+      color: var(--danger);
+      animation: glitchNudge 1.7s infinite;
+    }
+
+    .bar {
+      height: 9px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .bar-fill {
+      width: var(--value);
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--green), var(--amber));
+      transition: width 1s ease;
+      box-shadow: 0 0 18px rgba(57, 255, 136, 0.42);
+    }
+
+    .bar-fill.low {
+      background: linear-gradient(90deg, var(--danger), var(--amber));
+      animation: warningBuzz 0.35s infinite;
+    }
+
+    .status-warning {
+      min-height: 22px;
+      color: var(--amber);
+      font: 0.72rem var(--mono);
+    }
+
+    .calculator-wrap {
+      display: grid;
+      grid-template-columns: minmax(0, 0.88fr) minmax(280px, 1.12fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .calculator-card,
+    .result-card {
+      min-height: 280px;
+      padding: 28px;
+    }
+
+    .calculator-card p {
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .neon-button {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 0 18px;
+      border: 1px solid rgba(57, 255, 136, 0.54);
+      border-radius: 8px;
+      color: #021107;
+      background: var(--green);
+      box-shadow: 0 0 28px rgba(57, 255, 136, 0.28);
+      font: 800 0.86rem var(--mono);
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease;
+    }
+
+    .neon-button:hover {
+      transform: translateY(-3px);
+      filter: saturate(1.2);
+      box-shadow: 0 0 44px rgba(57, 255, 136, 0.48);
+    }
+
+    .neon-button.secondary {
+      color: var(--green);
+      background: rgba(57, 255, 136, 0.08);
+    }
+
+    .result-card {
+      display: grid;
+      place-items: center;
+      text-align: center;
+      font-family: var(--mono);
+    }
+
+    .result-title {
+      margin: 0 0 16px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+    }
+
+    .result-text {
+      min-height: 82px;
+      display: grid;
+      place-items: center;
+      margin: 0;
+      color: var(--green-soft);
+      font-size: clamp(1.35rem, 4vw, 2.4rem);
+      line-height: 1.18;
+    }
+
+    .loading-dots {
+      display: none;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 18px;
+    }
+
+    .loading-dots span {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: dotJump 0.8s ease-in-out infinite;
+    }
+
+    .loading-dots span:nth-child(2) {
+      animation-delay: 0.13s;
+    }
+
+    .loading-dots span:nth-child(3) {
+      animation-delay: 0.26s;
+    }
+
+    .result-card.loading .loading-dots {
+      display: flex;
+    }
+
+    .plan-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .plan-card {
+      padding: 26px;
+      transition: transform 0.3s ease, border-color 0.3s ease;
+    }
+
+    .plan-card:hover {
+      transform: translateY(-8px);
+      border-color: rgba(57, 255, 136, 0.58);
+    }
+
+    .plan-card h3 {
+      margin: 0 0 20px;
+      color: var(--green);
+      font: 1rem var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .plan-card.reality h3 {
+      color: var(--danger);
+    }
+
+    .plan-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .plan-list li {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      color: #dfffea;
+      transition: transform 0.22s ease, color 0.22s ease;
+    }
+
+    .plan-list li:hover {
+      transform: translateX(9px);
+      color: var(--green-soft);
+    }
+
+    .plan-list li::before {
+      content: "01";
+      width: 34px;
+      color: var(--muted);
+      font: 0.75rem var(--mono);
+    }
+
+    .plan-list li:nth-child(2)::before {
+      content: "02";
+    }
+
+    .plan-list li:nth-child(3)::before {
+      content: "03";
+    }
+
+    .plan-list li:nth-child(4)::before {
+      content: "04";
+    }
+
+    .exam-zone {
+      min-height: 420px;
+      padding: 34px;
+      display: grid;
+      grid-template-columns: minmax(0, 0.85fr) minmax(280px, 1.15fr);
+      gap: 28px;
+      align-items: center;
+    }
+
+    .exam-display {
+      position: relative;
+      min-height: 300px;
+      display: grid;
+      place-items: center;
+      border: 1px dashed rgba(57, 255, 136, 0.35);
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.28);
+      overflow: hidden;
+      text-align: center;
+    }
+
+    .exam-display.active {
+      border-color: rgba(255, 70, 100, 0.72);
+      animation: heartbeat 0.74s infinite;
+    }
+
+    .exam-display.active::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle, transparent 44%, rgba(255, 70, 100, 0.18));
+      animation: dangerSweep 1.5s ease-in-out infinite;
+    }
+
+    .countdown {
+      position: relative;
+      z-index: 1;
+      color: var(--green);
+      font: 800 clamp(3rem, 10vw, 7rem) var(--mono);
+      text-shadow: 0 0 32px rgba(57, 255, 136, 0.35);
+    }
+
+    .invigilator {
+      position: relative;
+      z-index: 1;
+      margin-top: 12px;
+      color: var(--amber);
+      font: 1rem var(--mono);
+      min-height: 28px;
+    }
+
+    .exam-copy p {
+      color: var(--muted);
+      line-height: 1.75;
+    }
+
+    .secret-panel {
+      display: grid;
+      place-items: center;
+      min-height: 360px;
+      padding: 28px;
+      text-align: center;
+    }
+
+    .secret-message {
+      max-width: 720px;
+      opacity: 0;
+      transform: translateY(20px) scale(0.98);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+
+    .secret-message.revealed {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .secret-message h2 {
+      color: var(--green);
+      text-shadow: 0 0 32px rgba(57, 255, 136, 0.32);
+    }
+
+    .secret-message p {
+      color: var(--muted);
+      font: 1rem/1.7 var(--mono);
+    }
+
+    .hidden-trigger {
+      position: fixed;
+      z-index: 15;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      opacity: 0.08;
+      border: 1px solid var(--green);
+      background: rgba(57, 255, 136, 0.4);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .hidden-trigger:hover {
+      opacity: 0.65;
+      transform: scale(1.2);
+    }
+
+    .hidden-trigger.one {
+      left: 18px;
+      top: 18px;
+    }
+
+    .hidden-trigger.two {
+      right: 92px;
+      top: 44%;
+    }
+
+    .hidden-trigger.three {
+      left: 11%;
+      bottom: 22px;
+    }
+
+    footer {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 40px 0 76px;
+      color: var(--muted);
+      font: 0.92rem var(--mono);
+      text-align: center;
+    }
+
+    .confetti {
+      position: fixed;
+      top: -16px;
+      z-index: 70;
+      width: 8px;
+      height: 14px;
+      background: var(--green);
+      animation: confettiFall 3.5s ease-in forwards;
+    }
+
+    @keyframes gridDrift {
+      to {
+        background-position: 88px 176px, 176px 88px;
+      }
+    }
+
+    @keyframes rainFall {
+      to {
+        transform: translateY(calc(100vh + 180px));
+      }
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    @keyframes glitchNudge {
+      0%, 92%, 100% {
+        transform: translate(0);
+      }
+      94% {
+        transform: translate(2px, -2px);
+      }
+      96% {
+        transform: translate(-2px, 1px);
+      }
+    }
+
+    @keyframes glitchSlice {
+      0%, 82%, 100% {
+        clip-path: inset(0 0 58% 0);
+      }
+      86% {
+        clip-path: inset(18% 0 36% 0);
+      }
+      90% {
+        clip-path: inset(62% 0 12% 0);
+      }
+    }
+
+    @keyframes panicBreathe {
+      50% {
+        width: 96%;
+        filter: brightness(1.25);
+      }
+    }
+
+    @keyframes warningBuzz {
+      50% {
+        transform: translateX(1px);
+      }
+    }
+
+    @keyframes dotJump {
+      50% {
+        transform: translateY(-8px);
+      }
+    }
+
+    @keyframes heartbeat {
+      0%, 100% {
+        transform: scale(1);
+      }
+      16% {
+        transform: scale(1.018);
+      }
+      32% {
+        transform: scale(1);
+      }
+      48% {
+        transform: scale(1.028);
+      }
+    }
+
+    @keyframes dangerSweep {
+      50% {
+        opacity: 0.35;
+      }
+    }
+
+    @keyframes crisisPulse {
+      50% {
+        background-color: #120206;
+      }
+    }
+
+    @keyframes victoryFlash {
+      50% {
+        background-color: #073b1b;
+      }
+    }
+
+    @keyframes confettiFall {
+      to {
+        transform: translateY(calc(100vh + 40px)) rotate(680deg);
+        opacity: 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    @media (max-width: 920px) {
+      body {
+        cursor: auto;
+      }
+
+      button,
+      a,
+      .hidden-trigger {
+        cursor: pointer;
+      }
+
+      .cursor-glow {
+        display: none;
+      }
+
+      section {
+        padding: 68px 0;
+      }
+
+      .hero-grid,
+      .calculator-wrap,
+      .exam-zone {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-terminal {
+        min-height: 340px;
+        transform: none;
+      }
+
+      .status-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .section-heading {
+        display: block;
+      }
+
+      .section-kicker {
+        margin-top: 16px;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .plan-grid,
+      .status-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .calculator-card,
+      .result-card,
+      .exam-zone,
+      .secret-panel {
+        padding: 20px;
+      }
+
+      .sound-toggle {
+        right: 12px;
+        bottom: 12px;
+      }
+
+      .hidden-trigger.two {
+        right: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="loader" id="loader" aria-live="polite">
+    <div class="loader-box">
+      <div class="loader-title">
+        <span>Booting Exam Mode</span>
+        <span>v4.00 AM</span>
+      </div>
+      <ul class="boot-lines">
+        <li><span>[OK]</span> Panic engine initialized</li>
+        <li><span>[OK]</span> Syllabus detected: impossible</li>
+        <li><span>[WARN]</span> Sleep reserves critically low</li>
+        <li><span>[OK]</span> Opening one more tab for notes</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="rain" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
+  <div class="cursor-glow" id="cursorGlow" aria-hidden="true"></div>
+
+  <button class="sound-toggle" id="soundToggle" aria-label="Toggle sound">SFX</button>
+  <button class="hidden-trigger one" data-secret aria-label="Hidden panic button"></button>
+  <button class="hidden-trigger two" data-secret aria-label="Hidden panic button"></button>
+  <button class="hidden-trigger three" data-secret aria-label="Hidden panic button"></button>
+
+  <main>
+    <section class="hero" id="top">
+      <div class="hero-grid">
+        <div>
+          <p class="eyebrow">college.exe is not responding</p>
+          <h1 class="glitch" data-text="Life in Exam Mode">Life in Exam Mode</h1>
+          <p class="subtitle">Surviving college one panic attack at a time.</p>
+          <div class="typing-row">
+            <span id="typingText"></span><span class="typing-cursor"></span>
+          </div>
+        </div>
+
+        <aside class="hero-terminal glass-card" aria-label="Exam terminal">
+          <div class="terminal-top"><span class="dot"></span></div>
+          <p class="terminal-line"><strong>student@hostel</strong>:~$ open syllabus.pdf</p>
+          <p class="terminal-line">Error: document contains 97 pages and emotional damage.</p>
+          <p class="terminal-line"><strong>student@hostel</strong>:~$ start revision</p>
+          <p class="terminal-line">Downloading confidence... 3% complete.</p>
+          <p class="terminal-line">Recommended action: stare at ceiling for 14 minutes.</p>
+          <div class="panic-meter" aria-label="Panic meter">
+            <div class="panic-fill"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="status">
+      <div class="section-heading">
+        <h2>Status Panel</h2>
+        <p class="section-kicker">Live telemetry from a student who said, "I will start tomorrow" for six consecutive tomorrows.</p>
+      </div>
+      <div class="status-grid" id="statusGrid"></div>
+    </section>
+
+    <section id="calculator">
+      <div class="section-heading">
+        <h2>Survival Calculator</h2>
+        <p class="section-kicker">Scientifically inaccurate. Emotionally precise.</p>
+      </div>
+      <div class="calculator-wrap">
+        <div class="calculator-card glass-card">
+          <p>Feed the machine one click and it will calculate your odds using caffeine level, syllabus weight, and the number of tabs currently pretending to be study material.</p>
+          <button class="neon-button" id="survivalButton">Calculate Today's Survival Chance</button>
+        </div>
+        <div class="result-card glass-card" id="resultCard">
+          <div>
+            <p class="result-title">Prediction Output</p>
+            <p class="result-text" id="resultText">Awaiting panic sample.</p>
+            <div class="loading-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="plan">
+      <div class="section-heading">
+        <h2>Plan vs Reality</h2>
+        <p class="section-kicker">A split-screen tragedy in four bullet points.</p>
+      </div>
+      <div class="plan-grid">
+        <article class="plan-card glass-card">
+          <h3>Ideal Plan</h3>
+          <ul class="plan-list">
+            <li>Wake up 4 AM</li>
+            <li>Revise Module 1</li>
+            <li>Become topper</li>
+          </ul>
+        </article>
+        <article class="plan-card reality glass-card">
+          <h3>Reality</h3>
+          <ul class="plan-list">
+            <li>Open Instagram</li>
+            <li>Watch random reels</li>
+            <li>Existential crisis</li>
+            <li>Sleep</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="exam">
+      <div class="section-heading">
+        <h2>Exam Hall Simulator</h2>
+        <p class="section-kicker">For maximum realism, please forget everything you studied.</p>
+      </div>
+      <div class="exam-zone glass-card">
+        <div class="exam-copy">
+          <p>The door closes. Pens click. Someone asks for an extra sheet after seven minutes. Reality bends.</p>
+          <button class="neon-button secondary" id="examButton">Enter Exam Hall</button>
+        </div>
+        <div class="exam-display" id="examDisplay" aria-live="polite">
+          <div>
+            <div class="countdown" id="countdown">03:00</div>
+            <div class="invigilator" id="invigilator">Waiting outside the hall.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="secret">
+      <div class="secret-panel glass-card">
+        <div class="secret-message" id="secretMessage">
+          <p class="eyebrow">secret ending unlocked</p>
+          <h2>You somehow passed.</h2>
+          <p>Records show no clear explanation. The department is investigating.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>Built during study leave instead of actually studying.</footer>
+
+  <script>
+    const phrases = [
+      "Studying... maybe.",
+      "Internal marks loading...",
+      "Brain not responding.",
+      "Coffee level critical."
+    ];
+
+    const statuses = [
+      { name: "Sleep", type: "percent", value: 2, warning: "micro-nap detected" },
+      { name: "Motivation", type: "text", value: "ERROR", warning: "restart required" },
+      { name: "Attendance", type: "percent", value: 61, warning: "borderline cinema" },
+      { name: "Brain Cells", type: "text", value: "Critical", warning: "single thread mode" },
+      { name: "Preparation Level", type: "text", value: "Unknown", warning: "data not found" }
+    ];
+
+    const survivalResults = [
+      "You may survive.",
+      "Prepare for supplementary.",
+      "Only divine intervention can save you.",
+      "Miracle required.",
+      "Pass probability found in deleted files.",
+      "Grace marks are now your best friend."
+    ];
+
+    const invigilatorMessages = [
+      "No malpractice.",
+      "Last 10 minutes.",
+      "Write register number.",
+      "Stop writing.",
+      "Tie your answer sheet properly.",
+      "Do not look here and there."
+    ];
+
+    const loader = document.getElementById("loader");
+    const typingText = document.getElementById("typingText");
+    const statusGrid = document.getElementById("statusGrid");
+    const survivalButton = document.getElementById("survivalButton");
+    const resultCard = document.getElementById("resultCard");
+    const resultText = document.getElementById("resultText");
+    const examButton = document.getElementById("examButton");
+    const examDisplay = document.getElementById("examDisplay");
+    const countdown = document.getElementById("countdown");
+    const invigilator = document.getElementById("invigilator");
+    const cursorGlow = document.getElementById("cursorGlow");
+    const soundToggle = document.getElementById("soundToggle");
+    const secretMessage = document.getElementById("secretMessage");
+    const confettiLayer = document.getElementById("confettiLayer");
+    const secretButtons = document.querySelectorAll("[data-secret]");
+
+    let typingPhrase = 0;
+    let typingIndex = 0;
+    let deleting = false;
+    let interactions = 0;
+    let secretsFound = new Set();
+    let audioOn = false;
+    let audioContext;
+    let examTimer;
+    let messageTimer;
+
+    window.addEventListener("load", () => {
+      setTimeout(() => loader.classList.add("done"), 1150);
+    });
+
+    function typeLoop() {
+      const phrase = phrases[typingPhrase];
+      typingText.textContent = phrase.slice(0, typingIndex);
+
+      if (!deleting && typingIndex < phrase.length) {
+        typingIndex += 1;
+      } else if (!deleting) {
+        deleting = true;
+        setTimeout(typeLoop, 1100);
+        return;
+      } else if (typingIndex > 0) {
+        typingIndex -= 1;
+      } else {
+        deleting = false;
+        typingPhrase = (typingPhrase + 1) % phrases.length;
+      }
+
+      setTimeout(typeLoop, deleting ? 34 : 58);
+    }
+
+    function renderStatuses() {
+      statusGrid.innerHTML = statuses.map((item, index) => {
+        const percent = item.type === "percent" ? item.value : index === 1 ? 9 : index === 3 ? 16 : 27;
+        const valueClass = item.value === "ERROR" || item.value === "Critical" ? "error" : "";
+        return `
+          <article class="status-card glass-card" data-status="${index}">
+            <div>
+              <div class="status-name">${item.name}</div>
+              <div class="status-value ${valueClass}" data-value>${item.type === "percent" ? item.value + "%" : item.value}</div>
+            </div>
+            <div>
+              <div class="bar" aria-hidden="true"><div class="bar-fill ${percent < 18 ? "low" : ""}" data-bar style="--value:${percent}%"></div></div>
+              <p class="status-warning">${item.warning}</p>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function decayStatuses() {
+      document.querySelectorAll(".status-card").forEach(card => {
+        const index = Number(card.dataset.status);
+        const data = statuses[index];
+        const bar = card.querySelector("[data-bar]");
+        const value = card.querySelector("[data-value]");
+
+        if (data.type === "percent") {
+          data.value = Math.max(0, data.value - Math.floor(Math.random() * 2));
+          value.textContent = `${data.value}%`;
+          bar.style.setProperty("--value", `${data.value}%`);
+          bar.classList.toggle("low", data.value < 18);
+        } else {
+          const current = Number.parseInt(bar.style.getPropertyValue("--value"), 10) || 25;
+          const next = Math.max(3, current - Math.ceil(Math.random() * 3));
+          bar.style.setProperty("--value", `${next}%`);
+          bar.classList.toggle("low", next < 18);
+        }
+      });
+    }
+
+    function createRain() {
+      const count = window.innerWidth < 720 ? 34 : 72;
+      for (let i = 0; i < count; i += 1) {
+        const streak = document.createElement("span");
+        streak.className = "orb";
+        streak.style.left = `${Math.random() * 100}%`;
+        streak.style.animationDuration = `${5 + Math.random() * 7}s`;
+        streak.style.animationDelay = `${Math.random() * -10}s`;
+        streak.style.opacity = `${0.18 + Math.random() * 0.5}`;
+        document.body.appendChild(streak);
+      }
+    }
+
+    function trackInteraction() {
+      interactions += 1;
+      if (interactions >= 9 || secretsFound.size >= 3) {
+        revealSecret();
+      }
+    }
+
+    function playTone(frequency, duration, type = "sine", gain = 0.045) {
+      if (!audioOn) return;
+      audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const volume = audioContext.createGain();
+      oscillator.type = type;
+      oscillator.frequency.value = frequency;
+      volume.gain.value = gain;
+      oscillator.connect(volume);
+      volume.connect(audioContext.destination);
+      oscillator.start();
+      volume.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
+      oscillator.stop(audioContext.currentTime + duration);
+    }
+
+    function playVictory() {
+      [392, 523, 659, 784].forEach((note, index) => {
+        setTimeout(() => playTone(note, 0.22, "triangle", 0.055), index * 120);
+      });
+    }
+
+    survivalButton.addEventListener("click", () => {
+      trackInteraction();
+      playTone(220, 0.16, "square");
+      resultCard.classList.add("loading");
+      resultText.textContent = "Scanning unread chapters...";
+      survivalButton.disabled = true;
+
+      setTimeout(() => {
+        const result = survivalResults[Math.floor(Math.random() * survivalResults.length)];
+        resultText.textContent = result;
+        resultCard.classList.remove("loading");
+        survivalButton.disabled = false;
+        playTone(result.includes("Miracle") ? 130 : 440, 0.22, "sawtooth");
+      }, 1550);
+    });
+
+    examButton.addEventListener("click", () => {
+      trackInteraction();
+      playTone(96, 0.24, "sawtooth", 0.06);
+      document.body.classList.add("exam-mode");
+      examDisplay.classList.add("active");
+      clearInterval(examTimer);
+      clearInterval(messageTimer);
+
+      let seconds = 180;
+      const updateTimer = () => {
+        const min = String(Math.floor(seconds / 60)).padStart(2, "0");
+        const sec = String(seconds % 60).padStart(2, "0");
+        countdown.textContent = `${min}:${sec}`;
+        if (seconds <= 0) {
+          clearInterval(examTimer);
+          clearInterval(messageTimer);
+          invigilator.textContent = "Stop writing.";
+          document.body.classList.remove("exam-mode");
+          playTone(72, 0.4, "square", 0.06);
+          return;
+        }
+        seconds -= 1;
+      };
+
+      updateTimer();
+      invigilator.textContent = "Question paper distributed.";
+      examTimer = setInterval(updateTimer, 1000);
+      messageTimer = setInterval(() => {
+        invigilator.textContent = invigilatorMessages[Math.floor(Math.random() * invigilatorMessages.length)];
+        playTone(150 + Math.random() * 80, 0.1, "square", 0.025);
+      }, 2400);
+    });
+
+    soundToggle.addEventListener("click", () => {
+      audioOn = !audioOn;
+      soundToggle.textContent = audioOn ? "ON" : "SFX";
+      soundToggle.setAttribute("aria-label", audioOn ? "Sound on" : "Sound off");
+      if (audioOn) playTone(520, 0.15, "triangle");
+    });
+
+    secretButtons.forEach((button, index) => {
+      button.addEventListener("click", () => {
+        secretsFound.add(index);
+        button.style.display = "none";
+        trackInteraction();
+        playTone(760, 0.13, "triangle");
+      });
+    });
+
+    document.addEventListener("pointermove", event => {
+      cursorGlow.style.left = `${event.clientX}px`;
+      cursorGlow.style.top = `${event.clientY}px`;
+    });
+
+    document.addEventListener("pointerdown", () => {
+      cursorGlow.classList.add("active");
+      trackInteraction();
+      setTimeout(() => cursorGlow.classList.remove("active"), 160);
+    });
+
+    function revealSecret() {
+      if (secretMessage.classList.contains("revealed")) return;
+      secretMessage.classList.add("revealed");
+      document.body.classList.add("victory");
+      playVictory();
+      launchConfetti();
+      setTimeout(() => document.body.classList.remove("victory"), 2800);
+    }
+
+    function launchConfetti() {
+      const colors = ["#39ff88", "#f3fff7", "#ffcf5a", "#ff4664"];
+      for (let i = 0; i < 90; i += 1) {
+        const piece = document.createElement("span");
+        piece.className = "confetti";
+        piece.style.left = `${Math.random() * 100}%`;
+        piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+        piece.style.animationDuration = `${2.4 + Math.random() * 1.9}s`;
+        piece.style.animationDelay = `${Math.random() * 0.45}s`;
+        piece.style.transform = `rotate(${Math.random() * 180}deg)`;
+        confettiLayer.appendChild(piece);
+        setTimeout(() => piece.remove(), 4800);
+      }
+    }
+
+    document.querySelectorAll(".glass-card, .neon-button, .hidden-trigger").forEach(item => {
+      item.addEventListener("mouseenter", () => cursorGlow.classList.add("active"));
+      item.addEventListener("mouseleave", () => cursorGlow.classList.remove("active"));
+    });
+
+    renderStatuses();
+    createRain();
+    typeLoop();
+    setInterval(decayStatuses, 3200);
+  </script>
+</body>
+</html>
